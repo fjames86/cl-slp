@@ -3,36 +3,83 @@
   (:use :cl :cffi)
   (:export #:slp-open
 		   #:slp-close
+
+		   ;; internal 
 		   #:slp-find-scopes
 		   #:slp-get-property
 		   #:slp-set-property
 		   #:slp-get-refresh-interval
+
+		   ;; discovery
 		   #:slp-find-servers
 		   #:slp-find-server-types
 		   #:slp-find-attributes
+
+		   ;; registration
 		   #:slp-register
 		   #:slp-deregister
-		   #:slp-delete-attributes
+
+		   ;; utils
 		   #:slp-escape
 		   #:slp-unescape
 		   #:slp-parse-url
-		   #:slp-service-url
+		   #:slp-format-url
+		   #:slp-format-attributes
 		   
+		   ;; macros for defining callbacks
 		   #:define-server-type-callback
 		   #:define-server-url-callback		   
 		   #:define-attr-callback
-		   #:define-register-callback))
+		   #:define-register-callback
+
+		   ))
 
 (in-package :cl-slp)
 
 ;; ------
 
+;; push a default path onto the foreign library dir for windows use
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (when (member :windows *features*)
+    (push "C:/Program Files (x86)/OpenSLP/" *foreign-library-directories*)))
+
 (define-foreign-library libslp
   (:unix (:or "libslp.so" "libslp.so.1"))
-  (:windows "libslp.dll")
+  (:windows "slp.dll")
   (t (:default "libslp")))
 
 (use-foreign-library libslp)
+
+;; --------------- utils ---------
+
+
+(defun split-string (string &optional (split-char #\space))
+  (flet ((delimiterp (char)
+		   (char= char split-char)))
+    (loop for beg = 0 then (position-if-not #'delimiterp string :start (1+ end))
+       for end = (when beg 
+				   (position-if #'delimiterp string :start beg))
+       collect (subseq string beg end)
+       while end)))
+
+(defun split-attribute-string (string)
+  "Split an attribute string into an assoc list. Attr strings are formatted
+as (name=value),(name=val1,val2,val3), i.e. comma seperated lists"
+  (loop for beg = 0 then (position-if (lambda (c)
+										(char= c #\())
+									  string
+									  :start (1+ end))
+     for end = (when beg
+				 (position-if (lambda (c)
+								(char= c #\)))
+							  string
+							  :start (1+ beg)))
+     nconc (if (and beg end)
+			   (let* ((attr-str (subseq string (1+ beg) end))
+					  (p (position #\= attr-str :test #'char=)))
+				 (list (cons (intern (subseq attr-str 0 p) "KEYWORD")
+							 (split-string (subseq attr-str (1+ p)) #\,)))))
+     while (and beg end)))
 
 
 ;; ----- types -----------------
@@ -53,50 +100,50 @@
 (defctype slp-server-type-callback :pointer)
 
 (defmacro define-server-type-callback
-	(name (handle server-types error-code cookie) &body body)
+    (name (handle server-types error-code cookie) &body body)
   `(defcallback ,name slp-bool
-	   ((,handle slp-handle)
+       ((,handle slp-handle)
 		(,server-types :string)
 		(,error-code slp-error)
 		(,cookie :pointer))
-	 (declare (ignorable ,handle ,server-types ,error-code ,cookie))
-	 ,@body))
+     (declare (ignorable ,handle ,server-types ,error-code ,cookie))
+     ,@body))
 
 (defctype slp-server-url-callback :pointer)
 
 (defmacro define-server-url-callback
-	(name (handle url lifetime error-code cookie) &body body)
+    (name (handle url lifetime error-code cookie) &body body)
   `(defcallback ,name slp-bool
-	   ((,handle slp-handle)
+       ((,handle slp-handle)
 		(,url :string)
 		(,lifetime :unsigned-short)
 		(,error-code slp-error)
 		(,cookie :pointer))
-	 (declare (ignorable ,handle ,url ,lifetime ,error-code ,cookie))
-	 ,@body))
+     (declare (ignorable ,handle ,url ,lifetime ,error-code ,cookie))
+     ,@body))
 
 (defctype slp-attr-callback :pointer)
 
 (defmacro define-attr-callback
-	(name (handle attr-list error-code cookie) &body body)
+    (name (handle attr-list error-code cookie) &body body)
   `(defcallback ,name slp-bool
-	   ((,handle slp-handle)
+       ((,handle slp-handle)
 		(,attr-list :string)
 		(,error-code slp-error)
 		(,cookie :pointer))
-	 (declare (ignorable ,handle ,attr-list ,error-code ,cookie))
-	 ,@body))
+     (declare (ignorable ,handle ,attr-list ,error-code ,cookie))
+     ,@body))
 
 (defctype slp-register-callback :pointer)
 
 (defmacro define-register-callback
-	(name (handle error-code cookie) &body body)
+    (name (handle error-code cookie) &body body)
   `(defcallback ,name :void
-	   ((,handle slp-handle)
+       ((,handle slp-handle)
 		(,error-code slp-error)
 		(,cookie :pointer))
-	 (declare (ignorable ,handle ,error-code ,cookie))
-	 ,@body))
+     (declare (ignorable ,handle ,error-code ,cookie))
+     ,@body))
 
 
 ;; ------- errors -------------
@@ -111,36 +158,36 @@
 
 (defparameter *slp-error-messages*
   '((0 . "OK")
-	(-1 . "Language no supported")
-	(-2 . "Parse error")
-	(-3 . "Invalid registration")
-	(-4 . "Scope not supported")
-	(-6 . "Authentication absent")
-	(-7 . "Authentication failed")
-	(-13 . "Invalid update")
-	(-15 . "Refresh rejected")
-	(-17 . "Not Implemented")
-	(-18 . "Buffer overflow")
-	(-19 . "Network timed out")
-	(-20 . "Network init failed")
-	(-21 . "Memory alloc failed")
-	(-22 . "Parameter bad")
-	(-23 . "Network error")
-	(-24 . "Internal system error")
-	(-25 . "Handle in use")
-	(-26 . "Type error")
-	(-27 . "Retry unicast")))
+    (-1 . "Language no supported")
+    (-2 . "Parse error")
+    (-3 . "Invalid registration")
+    (-4 . "Scope not supported")
+    (-6 . "Authentication absent")
+    (-7 . "Authentication failed")
+    (-13 . "Invalid update")
+    (-15 . "Refresh rejected")
+    (-17 . "Not Implemented")
+    (-18 . "Buffer overflow")
+    (-19 . "Network timed out")
+    (-20 . "Network init failed")
+    (-21 . "Memory alloc failed")
+    (-22 . "Parameter bad")
+    (-23 . "Network error")
+    (-24 . "Internal system error")
+    (-25 . "Handle in use")
+    (-26 . "Type error")
+    (-27 . "Retry unicast")))
 
 (defmacro slp-error (&body body)
   (let ((gerr (gensym "ERROR-CODE")))
-	`(let ((,gerr (progn ,@body)))
-	   (if (< ,gerr 0)
+    `(let ((,gerr (progn ,@body)))
+       (if (< ,gerr 0)
 		   (error 'slp-condition
 				  :code ,gerr
 				  :message (let ((m (assoc ,gerr *slp-error-messages*)))
 							 (if m (cdr m) "Unknown error")))
 		   t))))
-		     
+
 ;; ------------- foreign calls ---------
 
 ;; open
@@ -153,9 +200,10 @@
   (handle (:pointer slp-handle)))
 
 (defun slp-open (&optional is-async)
+  "Initialise access to the OpenSLP library"
   (unless *slp-handle*
-	(let ((handle (foreign-alloc 'slp-handle)))
-	  (with-foreign-string (lang "en")
+    (let ((handle (foreign-alloc 'slp-handle)))
+      (with-foreign-string (lang "en")
 		(let ((ret-code (%slp-open lang is-async handle)))
 		  (setf *slp-handle* handle)
 		  (slp-error ret-code))))))
@@ -167,17 +215,18 @@
 
 (defun slp-close ()
   (when *slp-handle*
-	(%slp-close (mem-ref *slp-handle* 'slp-handle))
-	(foreign-free *slp-handle*)
-	(setf *slp-handle* nil)
-	nil))
+    (%slp-close (get-handle))
+    (foreign-free *slp-handle*)
+    (setf *slp-handle* nil)
+    nil))
 
 ;;
 
 (defun get-handle ()
+  "Get the handle currently in use by cl-slp"
   (if *slp-handle*
-	  (mem-ref *slp-handle* 'slp-handle)
-	  (error 'slp-condition
+      (mem-ref *slp-handle* 'slp-handle)
+      (error 'slp-condition
 			 :message "SLP not opened, call OPEN-SLP first")))
 
 ;; slp free
@@ -186,6 +235,7 @@
   (mem :pointer))
 
 (defun slp-free (pointer)
+  "Used to free any memory allocated by OpenSLP"
   (%slp-free pointer)
   nil)
 
@@ -196,23 +246,25 @@
   (scope-list (:pointer :string)))
 
 (defun slp-find-scopes ()
+  "Set the list of scopes"
   (with-foreign-object (scopes :pointer)
-	(let ((error-code (%slp-find-scopes (get-handle)
+    (let ((error-code (%slp-find-scopes (get-handle)
 										scopes)))
-	  (if (zerop error-code)
+      (if (zerop error-code)
 		  (prog1
-			(mem-ref scopes :string)
+			  (mem-ref scopes :string)
 			(slp-free (mem-ref scopes :pointer)))
 		  (slp-error error-code)))))
-	  
+
 ;; get property
 
 (defcfun ("SLPGetProperty" %slp-get-property) :string
   (name :string))
 
 (defun slp-get-property (name)
+  "Get an SLP property. See *slp-properties* for a list of valid properties"
   (with-foreign-string (n name)
-	(%slp-get-property n)))
+    (%slp-get-property n)))
 
 (defparameter *slp-properties*
   (list "net.slp.useScopes"
@@ -237,7 +289,7 @@
 		"net.slp.useIPV4"
 		"net.slp.useIPV6"))
 
-		
+
 ;; set property
 
 (defcfun ("SLPSetProperty" %slp-set-property) :void
@@ -245,9 +297,10 @@
   (value :string))
 
 (defun slp-set-property (name value)
+  "Set an SLP property. This function is ignored by OpenSLP"
   (with-foreign-string (n name)
-	(with-foreign-string (v value)
-	  (%slp-set-property n v))))
+    (with-foreign-string (v value)
+      (%slp-set-property n v))))
 
 ;; get refresh interval
 
@@ -268,24 +321,33 @@
 
 (defparameter *default-server-url-callback* 'default-server-url-callback)
 
+(defparameter *default-server-url-list* nil)
+
 (define-server-url-callback default-server-url-callback
-	(handle url lifetime error-code cookie)
-  (format t "Url: ~A~%" url)
+    (handle url lifetime error-code cookie)
+  (when url
+    (push url *default-server-url-list*))
   t)
 
 (defun slp-find-servers (server-type
 						 &key (callback-name *default-server-url-callback*)
 						 (scope-list "") (filter "") cookie)
+  "Returns a list of servers found of the specified type"
   (with-foreign-string (stype server-type)
-	(with-foreign-string (slist scope-list)
-	  (with-foreign-string (f filter)
-		(slp-error 
-		  (%slp-find-servers (get-handle)
-							 stype
-							 slist
-							 f
-							 (get-callback callback-name)
-							 (if cookie cookie (null-pointer))))))))
+    (with-foreign-string (slist scope-list)
+      (with-foreign-string (f filter)
+		(setf *default-server-url-list* nil)
+		(let ((error-code
+			   (%slp-find-servers (get-handle)
+								  stype
+								  slist
+								  f
+								  (get-callback callback-name)
+								  (if cookie cookie (null-pointer)))))
+		  (if (zerop error-code)
+			  *default-server-url-list*
+			  (slp-error error-code)))))))
+
 
 ;; --- find server types
 
@@ -298,21 +360,32 @@
 
 (defparameter *default-server-type-callback* 'default-server-type-callback)
 
+(defparameter *default-server-type-list* nil)
+
 (define-server-type-callback default-server-type-callback
-	(handle server-types error-code cookie)
-  (format t "Server-types: ~A~%" server-types)
+    (handle server-types error-code cookie)
+  (when server-types
+    (let ((types (split-string server-types #\,)))
+      (mapc (lambda (type)
+			  (push type *default-server-type-list*))
+			types)))
   t)
 
 (defun slp-find-server-types (&key (callback-name *default-server-type-callback*)
-							  (naming-authority "") (scope-list "") cookie)
+							  (naming-authority "*") (scope-list "") cookie)
+  "Returns a list of server types found"
   (with-foreign-string (nauth naming-authority)
-	(with-foreign-string (slist scope-list)
-	  (slp-error
-		(%slp-find-server-types (get-handle)
-								nauth
-								slist
-								(get-callback callback-name)
-								(if cookie cookie (null-pointer)))))))
+    (with-foreign-string (slist scope-list)
+      (setf *default-server-type-list* nil)
+      (let ((error-code 
+			 (%slp-find-server-types (get-handle)
+									 nauth
+									 slist
+									 (get-callback callback-name)
+									 (if cookie cookie (null-pointer)))))
+		(if (zerop error-code)
+			*default-server-type-list*
+			(slp-error error-code))))))
 
 ;;; find attrs
 
@@ -326,24 +399,40 @@
 
 (defparameter *default-attr-callback* 'default-attr-callback)
 
+(defparameter *default-attr-list* nil)
+
 (define-attr-callback default-attr-callback
-	(handle attr-list error-code cookie)
-  (format t "Attr-list: ~A~%" attr-list)
+    (handle attr-list error-code cookie)
+  (when attr-list
+    ;; the attribute list is a comma seperated list with name=value pairs
+    ;; (name=value), (name=value), ...
+    (let ((alist (split-attribute-string attr-list)))
+      (mapc (lambda (attr)
+			  (when (not (assoc (car attr) *default-attr-list*))
+				(push attr *default-attr-list*)))
+			alist)))
   t)
 
 (defun slp-find-attributes (url
 							&key (callback-name *default-attr-callback*)
 							(attrib-ids "") (scope-list "") cookie)
+  "Returns a list of the attribute sets found on the url specified. Each attribute set is an assoc list 
+of attribute name and value(s) associated with it. There may be multiple attribute lists associated with 
+the url."
   (with-foreign-string (aids attrib-ids)
-	(with-foreign-string (slist scope-list)
-	  (with-foreign-string (u url)
-		(slp-error
-		  (%slp-find-attributes (get-handle)
-								u
-								slist
-								aids
-								(get-callback callback-name)
-								(if cookie cookie (null-pointer))))))))
+    (with-foreign-string (slist scope-list)
+      (with-foreign-string (u url)
+		(setf *default-attr-list* nil)
+		(let ((error-code 
+			   (%slp-find-attributes (get-handle)
+									 u
+									 slist
+									 aids
+									 (get-callback callback-name)
+									 (if cookie cookie (null-pointer)))))
+		  (if (zerop error-code)
+			  *default-attr-list*
+			  (slp-error error-code)))))))
 
 ;;; -----------
 
@@ -360,7 +449,7 @@
 (defparameter *default-register-callback* 'default-register-callback)
 
 (define-register-callback default-register-callback
-	(handle error-code cookie)
+    (handle error-code cookie)
   (format t "Register: ~A~%" error-code)
   t)
 
@@ -372,22 +461,31 @@
 					 (lifetime *default-lifetime*)
 					 (attributes "")
 					 cookie)
+  "Register a service with SLP. Needs slpd to be installed and runnign on the system"
   (with-foreign-string (u url)
-	(with-foreign-string (a attributes)
-	  (slp-error
-		(%slp-register (get-handle)
-					   u
-					   lifetime
-					   (null-pointer) ; server type is ignored
-					   a
-					   t ; fresh is always true
-					   (get-callback callback-name)
-					   (if cookie cookie (null-pointer)))))))
+    (with-foreign-string (a attributes)
+      (let ((error-code 
+			 (%slp-register (get-handle)
+							u
+							lifetime
+							(null-pointer) ; server type is ignored
+							a
+							t ; fresh is always true
+							(get-callback callback-name)
+							(if cookie cookie (null-pointer)))))
+		(cond
+		  ((zerop error-code)
+		   t)
+		  ((= error-code -19)
+		   (format *error-output* "WARNING: SLP-REGISTER returned error code NETWORK_TIMED_OUT~%")
+		   t)
+		  (t
+		   (slp-error error-code)))))))
 
 ;; ----- deregister 
 
 (defcfun ("SLPDereg" %slp-deregister) slp-error
-  (handle slp-error)
+  (handle slp-handle)
   (url :string)
   (callback slp-register-callback)
   (cookie :pointer))
@@ -395,47 +493,28 @@
 (defparameter *default-deregister-callback* 'default-deregister-callback)
 
 (define-register-callback default-deregister-callback
-	(handle error-code cookie)
+    (handle error-code cookie)
   (format t "Deregister: ~A~%" error-code)
   t)
 
 (defun slp-deregister (url
 					   &key (callback-name *default-deregister-callback*)
 					   cookie)
+  "Deregister the service"
   (with-foreign-string (u url)
-	(slp-error
-	  (%slp-deregister (get-handle)
-					   u
-					   (get-callback callback-name)
-					   (if cookie cookie (null-pointer))))))
-
-;;
-
-(defcfun ("SLPDelAttrs" %slp-del-attrs) slp-error
-  (handle slp-handle)
-  (url :string)
-  (attrs :string)
-  (callback slp-register-callback)
-  (cookie :pointer))
-
-(defparameter *default-del-attr-callback* 'default-del-attr-callback)
-
-(define-register-callback default-del-attr-callback
-	(handle error-code cookie)
-  (format t "Del attr: ~A~%" error-code)
-  t)
-
-(defun slp-delete-attributes (url attrs
-							  &key (callback-name *default-del-attr-callback*)
-							  cookie)
-  (with-foreign-string (u url)
-	(with-foreign-string (a attrs)
-	  (slp-error
-		(%slp-del-attrs (get-handle)
-						u
-						a
-						(get-callback callback-name)
-						(if cookie cookie (null-pointer)))))))
+    (let ((error-code
+		   (%slp-deregister (get-handle)
+							u
+							(get-callback callback-name)
+							(if cookie cookie (null-pointer)))))
+      (cond
+		((zerop error-code)
+		 t)
+		((= error-code -19)
+		 (format *error-output* "WARNING: SLP-DEREGISTER returned error code NETWORK_TIMED_OUT~%")
+		 t)
+		(t
+		 (slp-error error-code))))))
 
 ;;;
 
@@ -445,8 +524,8 @@
 
 (defun slp-parse-url (url)
   (with-foreign-string (u url)
-	(with-foreign-object (server-url :pointer)
-	  (let ((error-code
+    (with-foreign-object (server-url :pointer)
+      (let ((error-code
 			 (%slp-parse-url u server-url)))
 		(if (zerop error-code)
 			(prog1
@@ -482,9 +561,10 @@
   (istag slp-bool))
 
 (defun slp-escape (str &optional istag)
+  "Properly escape SLP strings"
   (with-foreign-string (un str)
-	(with-foreign-object (es :pointer)
-	  (let ((error-code (%slp-escape un es istag)))
+    (with-foreign-object (es :pointer)
+      (let ((error-code (%slp-escape un es istag)))
 		(if (zerop error-code)
 			(prog1
 				(foreign-string-to-lisp (mem-ref es :pointer))
@@ -497,15 +577,40 @@
   (istag slp-bool))
 
 (defun slp-unescape (str &optional istag)
+  "Unescape SLP strings"
   (with-foreign-string (es str)
-	(with-foreign-object (un :pointer)
-	  (let ((error-code (%slp-unescape es un istag)))
+    (with-foreign-object (un :pointer)
+      (let ((error-code (%slp-unescape es un istag)))
 		(if (zerop error-code)
 			(prog1
 				(foreign-string-to-lisp (mem-ref un :pointer))
 			  (slp-free (mem-ref un :pointer)))
 			(slp-error error-code))))))
 
-(defun slp-service-url (service-type address)
+(defun slp-format-url (service-type address)
+  "Format an SLP service URL"
   (format nil "service:~A://~A" service-type address))
 
+(defun slp-format-attributes (attribute-alist)
+  "Format an assoc list of attributes into an slp attribute string"
+  (with-output-to-string (s)
+    (loop with printed = nil
+	   for attr-pair in attribute-alist 
+	   do 
+		 (progn
+		   (when printed
+			 (format s ","))
+		   (format s "(~A=" (car attr-pair))
+		   (let ((vals (cdr attr-pair)))
+			 (if (atom vals)
+				 (format s "~A" vals)
+				 (loop with pr = nil
+					for val in vals
+					do 
+					  (progn
+						(when pr
+						  (format s ","))
+						(format s "~A" val)
+						(setf pr t)))))
+		   (format s ")")
+		   (setf printed t)))))
