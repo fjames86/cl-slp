@@ -20,6 +20,9 @@ is available to be loaded on your system. CL-SLP automatically pushes "C:/progra
 
 * Call SLP-CLOSE when finished using the library, this frees the memory allocated both by OpenSLP and CL-SLP
 
+* Get SLP properties using SLP-GET-PROPERTY and SLP-GET-PROPERTIES. 
+These return a specific property and all SLP properties respectively.
+
 * Discover services using SLP-FIND-SERVERS 
 This returns a list of discovered service urls
 
@@ -31,13 +34,16 @@ This returns a list of assoc lists for attributes of the given server
 * Get discovered server types using SLP-FIND-SERVER-TYPES
 This returns a list of discovered server types. These can be used as input to SLP-FIND-SERVERS
 
-* Register a service using SLP-REGISTER
+* Discover all servers on all types using SLP-FIND-ALL-SERVERS. 
+This just maps over the server types and calls SLP-FIND-SERVERS
+
+* Register a service using SLP-REGISTER 
+The lifetime must be positive and less than CL-SLP::*maximum-lifetime* = 65535. 
+By default it is CL-SLP::*default-lifetime* = 10800, which is the OpenSLP default.
 
 * Deregister a service using SLP-DEGREGISTER
 
-* Delete a service attributes using SLP-DELETE-ATTRIBUTES
-
-Other utility functions provided by OpenSLP are
+Other utility functions provided by CL-SLP are
 
 * Parse service urls using SLP-PARSE-URL
 
@@ -49,10 +55,13 @@ Other utility functions provided by OpenSLP are
 This takes the service type (e.g. "wbem:https")  and the address (e.g. "localhost:5989") and 
 returns the correctly formatted url "service:wbem:https://localhost:5898"
 
-* Form an SLP attribute string from an assoc list of attributes. Note that since SLP attributes
-can take a list of values the assoc list can map attribute names to either atoms or lists .e.g.
+* Form an SLP attribute string from an assoc list of attributes using SLP-FORMAT-ATTRIBUTES
+ Note that since SLP attributes map names to a list of values, this function accepts as input
+an assoc list that maps names to either atoms or lists, e.g.
 (slp-format-attributes '((:a . 123) (:b 321) (:c 123 456)) -> "(A=123),(B=321),(C=123,456)"
 
+* CL-SLP generates Common Lisp errors of type SLP-ERROR, this is an exported symbol. OpenSLP
+error codes are translated into Common Lisp SLP-ERROR objects.
 
 Notes
 ------
@@ -63,10 +72,17 @@ may if they wish define their own callbacks using the macros
 DEFINE-SERVER-TYPE-CALLBACK, DEFINE-SERVER-URL-CALLBACK, DEFINE-ATTR-CALLBACK and DEFINE-REGISTER-CALLBACK.
 
 They can be called by passing the name of the new callback with the :callback-name keyword parameter to 
-the functions that take it. The default behaviour should be sufficient for most needs, however. 
+the functions that take it. 
+
+The default callbacks should be sufficient for most needs because they just collect all the data
+available and return it to Lisp.
 
 Note also that you MUST use a Lisp that supports callbacks; CL-SLP was developed and tested using SBCL
 on Ubuntu Linux and Windows 7.
+
+All the callbacks take an optional argument, COOKIE, that is a pointer to an area of memory for use in
+return values. This doesn't make much sense in Common Lisp, since we have other ways of returning data
+from callbacks so it probably should be either ignored or removed from the Lisp calls.
 
 * Error -19 NETWORK_TIMED_OUT
 This error code seems to be returned on Windows 7 machines (possibly others) on SLP-REGISTER and
@@ -78,21 +94,38 @@ CL-SLP therefore ignores this error, but prints a message to *error-output*.
 Example
 --------
 
-* Find services
+* Find service types
 (slp-find-server-types)
 --> ("service:wbem:https")
 
-* Register a service
-(slp-register (slp-format-url "myservice.x" "localhost:8000"))
+* Find all servers
+(slp-find-all-servers)
+--> ("service:wbem:https://localhost:5989")
+
+* Register a service 
+(slp-register "service:myservice.x://localhost:8000" :attributes '((:num1 123) (:num2 321)))
 --> T
 
-* Find services 
+* Find services on the new service type
 (slp-find-servers "myservice.x")
 --> ("service:myservice.x://localhost:8000")
 
+* Get attributes (try on a remote machine)
+(slp-find-attributes "service:myservice.x://localhost:8000")
+--> ((:NUM1 123) (:NUM2 321))
+
+* On a remote machine using slptool
+$ slptool findattrs service:myservice.x://localhost:8000
+(NUM1=123),(NUM2=321)
+
 * Deregister service
-(slp-deregister (slp-format-url "myservice.x" "localhost:8000"))
+(slp-deregister "service:myservice.x://localhost:8000")
 --> T
+
+* Check it has now gone
+(slp-find-servers "myservice.x")
+--> NIL
+
 
 Note that the OpenSLP daemon (slpd) must be running for register/deregister functions to work.
 

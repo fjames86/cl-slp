@@ -7,7 +7,7 @@
 		   ;; internal 
 		   #:slp-find-scopes
 		   #:slp-get-property
-;		   #:slp-set-property    ; this doesn't do anything, don't export?
+		   #:slp-get-properties
 		   #:slp-get-refresh-interval
 
 		   ;; discovery
@@ -298,6 +298,12 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 		"net.slp.useIPV4"
 		"net.slp.useIPV6"))
 
+(defun slp-get-properties ()
+  "Get all SLP properties as an assoc list"
+  (mapcar (lambda (name)
+	    (cons (intern name "KEYWORD")
+		  (slp-get-property name)))
+	  *slp-properties*))
 
 ;; set property
 
