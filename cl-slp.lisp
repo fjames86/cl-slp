@@ -236,7 +236,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
       (mem-ref *slp-handle* 'slp-handle)
       (error 'slp-error
 	     :code ""
-	     :message "SLP not opened, call OPEN-SLP first")))
+	     :message "SLP not opened, call SLP-OPEN first")))
 
 ;; slp free
 
