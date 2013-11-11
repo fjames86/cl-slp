@@ -488,9 +488,9 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
   "Register a service with SLP. Needs slpd to be installed and running on the system"
   (with-foreign-string (u url)
     (with-foreign-string (a (cond
-							  ((null attributes) "")
 							  ((stringp attributes) attributes)
-							  ((listp attributes) (slp-format-attributes attributes))))
+							  ((listp attributes) (slp-format-attributes attributes))
+							  (t "")))
       (let ((error-code 
 			 (%slp-register (get-handle)
 							u
