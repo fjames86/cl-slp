@@ -47,10 +47,10 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (when (member :windows *features*)
     (pushnew "C:/Program Files (x86)/OpenSLP/" *foreign-library-directories*
-	     :test #'string-equal)))
+			 :test #'string-equal)))
 
 (define-foreign-library libslp
-  (:unix (:or "libslp.so" "libslp.so.1"))
+	(:unix (:or "libslp.so" "libslp.so.1"))
   (:windows "slp.dll")
   (t (:default "libslp")))
 
@@ -97,7 +97,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defctype slp-bool :boolean)
 
 (defcstruct slp-server-url
-  (server-type :string)
+	(server-type :string)
   (host :string)
   (port :int)
   (net-family :string)
@@ -110,10 +110,10 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defmacro define-server-type-callback
     (name (handle server-types error-code cookie) &body body)
   `(defcallback ,name slp-bool
-       ((,handle slp-handle)
-		(,server-types :string)
-		(,error-code slp-error-type)
-		(,cookie :pointer))
+	 ((,handle slp-handle)
+	  (,server-types :string)
+	  (,error-code slp-error-type)
+	  (,cookie :pointer))
      (declare (ignorable ,handle ,server-types ,error-code ,cookie))
      ,@body))
 
@@ -122,11 +122,11 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defmacro define-server-url-callback
     (name (handle url lifetime error-code cookie) &body body)
   `(defcallback ,name slp-bool
-       ((,handle slp-handle)
-		(,url :string)
-		(,lifetime :unsigned-short)
-		(,error-code slp-error-type)
-		(,cookie :pointer))
+	 ((,handle slp-handle)
+	  (,url :string)
+	  (,lifetime :unsigned-short)
+	  (,error-code slp-error-type)
+	  (,cookie :pointer))
      (declare (ignorable ,handle ,url ,lifetime ,error-code ,cookie))
      ,@body))
 
@@ -135,10 +135,10 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defmacro define-attr-callback
     (name (handle attr-list error-code cookie) &body body)
   `(defcallback ,name slp-bool
-       ((,handle slp-handle)
-		(,attr-list :string)
-		(,error-code slp-error-type)
-		(,cookie :pointer))
+	 ((,handle slp-handle)
+	  (,attr-list :string)
+	  (,error-code slp-error-type)
+	  (,cookie :pointer))
      (declare (ignorable ,handle ,attr-list ,error-code ,cookie))
      ,@body))
 
@@ -147,9 +147,9 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defmacro define-register-callback
     (name (handle error-code cookie) &body body)
   `(defcallback ,name :void
-       ((,handle slp-handle)
-		(,error-code slp-error-type)
-		(,cookie :pointer))
+	 ((,handle slp-handle)
+	  (,error-code slp-error-type)
+	  (,cookie :pointer))
      (declare (ignorable ,handle ,error-code ,cookie))
      ,@body))
 
@@ -189,11 +189,11 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun slp-raise-error (error-code)
   (if (< error-code 0)
       (error 'slp-error
-	     :code error-code
-	     :message (let ((m (assoc error-code *slp-error-messages*)))
-			(if m
-			    (cdr m)
-			    "Unknown Error")))
+			 :code error-code
+			 :message (let ((m (assoc error-code *slp-error-messages*)))
+						(if m
+							(cdr m)
+							"Unknown Error")))
       t))
 
 ;; ------------- foreign calls ---------
@@ -235,8 +235,8 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
   (if *slp-handle*
       (mem-ref *slp-handle* 'slp-handle)
       (error 'slp-error
-	     :code ""
-	     :message "SLP not opened, call SLP-OPEN first")))
+			 :code ""
+			 :message "SLP not opened, call SLP-OPEN first")))
 
 ;; slp free
 
@@ -301,9 +301,9 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun slp-get-properties ()
   "Get all SLP properties as an assoc list"
   (mapcar (lambda (name)
-	    (cons (intern name "KEYWORD")
-		  (slp-get-property name)))
-	  *slp-properties*))
+			(cons (intern name "KEYWORD")
+				  (slp-get-property name)))
+		  *slp-properties*))
 
 ;; set property
 
@@ -410,8 +410,8 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun slp-find-all-servers ()
   "Return a list of the urls of all servers found"
   (mapcan (lambda (type)
-	    (slp-find-servers type))
-	  (slp-find-server-types)))
+			(slp-find-servers type))
+		  (slp-find-server-types)))
 
 
 ;;; find attrs
@@ -483,11 +483,14 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun slp-register (url
 					 &key (callback-name *default-register-callback*)
 					 (lifetime *default-lifetime*)
-					 (attributes "")
+					 attributes 
 					 cookie)
   "Register a service with SLP. Needs slpd to be installed and running on the system"
   (with-foreign-string (u url)
-    (with-foreign-string (a attributes)
+    (with-foreign-string (a (cond
+							  ((null attributes) "")
+							  ((stringp attributes) attributes)
+							  ((listp attributes) (slp-format-attributes attributes))))
       (let ((error-code 
 			 (%slp-register (get-handle)
 							u
@@ -553,11 +556,11 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 			 (%slp-parse-url u server-url)))
 		(if (zerop error-code)
 			(prog1 (mapcar (lambda (name)
-					 (cons (intern (symbol-name name) "KEYWORD")
-					       (foreign-slot-value (mem-ref server-url :pointer)
-								   '(:struct slp-server-url)
-								   name)))
-				       '(server-type host port server-part net-family))
+							 (cons (intern (symbol-name name) "KEYWORD")
+								   (foreign-slot-value (mem-ref server-url :pointer)
+													   '(:struct slp-server-url)
+													   name)))
+						   '(server-type host port server-part net-family))
 			  (slp-free (mem-ref server-url :pointer)))
 			(slp-raise-error error-code))))))
 
