@@ -1,6 +1,7 @@
 
 (defpackage :cl-slp
   (:use :cl :cffi)
+  (:nicknames :slp)
   (:export #:slp-open
 		   #:slp-close
 
@@ -32,10 +33,10 @@
 
 		   ;; macros for defining callbacks
 		   ;; users shouldn't need these, don't export?
-		   #:define-server-type-callback
-		   #:define-server-url-callback
-		   #:define-attr-callback
-		   #:define-register-callback
+;		   #:define-server-type-callback
+;		   #:define-server-url-callback
+;		   #:define-attr-callback
+;		   #:define-register-callback
 
 		   ))
 
@@ -232,6 +233,10 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 
 (defun get-handle ()
   "Get the handle currently in use by cl-slp"
+  (unless *slp-handle*
+    (format *standard-output* "WARNING: opening a handle to OpenSLP~%")
+    (slp-open))
+
   (if *slp-handle*
       (mem-ref *slp-handle* 'slp-handle)
       (error 'slp-error
