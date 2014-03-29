@@ -40,7 +40,7 @@
 (in-package :cl-slp)
 
 
-;; ------
+;; ------------------------------------------------------
 
 ;; push a default path onto the foreign library dir for windows users
 #+win32
@@ -55,7 +55,7 @@
 
 (use-foreign-library libslp)
 
-;; --------------- utils ---------
+;; --------------- utils --------------------------
 
 
 (defun split-string (string &optional (split-char #\space))
@@ -87,7 +87,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
      while (and beg end)))
 
 
-;; ----- types -----------------
+;; -------------------------- types -------------------------------
 
 (defctype slp-error-type :int)
 
@@ -104,7 +104,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 
 (defctype slp-server-type-callback :pointer)
 
-;; ---- callback defining macros -------------
+;; -------------------- callback defining macros -------------
 
 (defmacro define-server-type-callback
     (name (handle server-types error-code cookie) &body body)
@@ -153,7 +153,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
      ,@body))
 
 
-;; ------- errors -------------
+;; -------------------- errors --------------------------------
 
 (define-condition slp-error (error)
   ((code :initarg :code :initform 0 :reader slp-error-code)
@@ -195,7 +195,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 			    "Unknown Error")))
       t))
 
-;; ------------- foreign calls ---------
+;; ------------- foreign calls --------------------------------
 
 ;; open
 
@@ -232,7 +232,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun get-handle ()
   "Get the handle currently in use by cl-slp"
   (unless *slp-handle*
-    (format *standard-output* "WARNING: opening a handle to OpenSLP~%")
+    (warn "Opening a handle to OpenSLP~%")
     (slp-open))
 
   (if *slp-handle*
@@ -316,7 +316,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 
 (defun set-property (name value)
   "Set an SLP property. This function is ignored by OpenSLP"
-  (format *error-output* "WARNING: OpenSLP ignores calls to SLPSetProperty")
+  (warn "OpenSLP ignores calls to SLPSetProperty")
 
   (with-foreign-string (n name)
     (with-foreign-string (v value)
@@ -368,7 +368,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	      *default-server-url-list*
 	      (slp-raise-error error-code)))))))
 
-;; --- find server types
+;; ------------------ find server types -------------------------
 
 (defcfun ("SLPFindSrvTypes" %slp-find-server-types) slp-error-type
   (handle slp-handle)
@@ -406,7 +406,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	    *default-server-type-list*
 	    (slp-raise-error error-code))))))
 
-;; --------
+;; ---------------------------------------------------------
 
 ;; find all servers
 
@@ -462,7 +462,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	      *default-attr-list*
 	      (slp-raise-error error-code)))))))
 
-;;; -----------
+;;; ----------------- registration -------------------------------------------
 
 (defcfun ("SLPReg" %slp-register) slp-error-type
   (handle slp-handle)
@@ -507,12 +507,12 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	  ((zerop error-code)
 	   t)
 	  ((= error-code -19)
-	   (format *error-output* "WARNING: SLP-REGISTER returned error code NETWORK_TIMED_OUT~%")
+	   (warn "SLP-REGISTER returned error code NETWORK_TIMED_OUT~%")
 	   t)
 	  (t
 	   (slp-raise-error error-code)))))))
 
-;; ----- deregister 
+;; --------------------- deregister ------------------------------
 
 (defcfun ("SLPDereg" %slp-deregister) slp-error-type
   (handle slp-handle)
@@ -541,12 +541,12 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	 t)
 	((= error-code -19)
 	 ;; this can happen after a successful deregister call on Windows... so issue a warning instead of error
-	 (format *error-output* "WARNING: SLP-DEREGISTER returned error code NETWORK_TIMED_OUT~%")
+	 (warn "SLP-DEREGISTER returned error code NETWORK_TIMED_OUT~%")
 	 t)
 	(t
 	 (slp-raise-error error-code))))))
 
-;;;
+;; ------------------------ utilities -----------------------
 
 (defcfun ("SLPParseSrvURL" %slp-parse-url) slp-error-type
   (url :string)
