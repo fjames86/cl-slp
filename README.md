@@ -86,8 +86,8 @@ DEREGISTER, even though the call appears to be successul. Services registered ar
 and can be deregistered again so appear to be working fine, even though these calls error.
 CL-SLP therefore ignores this error, but prints a message to *error-output*.
 
-Notes
-------
+API changes
+------------
 
 In earlier versions of CL-SLP the functions FIND-SERVICES, FIND-ALL-SERVICES and FIND-SERVICE-TYPES were
 slightly misnamed as FIND-SERVERS, FIND-ALL-SERVERS and FIND-SERVER-TYPES. These functions remain but are
@@ -98,11 +98,11 @@ Example
 
 ```
 ;; Find service types
-(slp:find-server-types)
+(slp:find-service-types)
 -> ("service:wbem:https")
 
 ;; Find all servers
-(slp:find-all-servers)
+(slp:find-all-services)
 -> ("service:wbem:https://localhost:5989")
 
 ;; Register a service 
@@ -110,7 +110,7 @@ Example
 -> T
 
 ;; Find services on the new service type
-(slp:find-servers "myservice.x")
+(slp:find-services "myservice.x")
 -> ("service:myservice.x://localhost:8000")
 
 ;; Get attributes (try on a remote machine)
@@ -126,7 +126,7 @@ Example
 -> T
 
 ;; Check it has now gone
-(slp:find-servers "myservice.x")
+(slp:find-services "myservice.x")
 -> NIL
 ```
 
