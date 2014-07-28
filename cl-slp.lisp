@@ -19,9 +19,12 @@
 	   #:get-refresh-interval
 
 	   ;; discovery
-	   #:find-servers
-	   #:find-all-servers
-	   #:find-server-types
+	   #:find-servers ;; deprecated
+	   #:find-services
+	   #:find-all-servers ;; deprecated
+	   #:find-all-services
+	   #:find-server-types ;; deprecated
+	   #:find-service-types
 	   #:find-attributes
 
 	   ;; utils provided by OpenSLP
@@ -349,9 +352,10 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
     (push url *default-server-url-list*))
   t)
 
-(defun find-servers (server-type
-			 &key (callback-name *default-server-url-callback*)
-			   (scope-list "") (filter "") cookie)
+(defun %find-services (server-type
+					   &key
+					   (callback-name *default-server-url-callback*)
+					   (scope-list "") (filter "") cookie)
   "Returns a list of servers found of the specified type"
   (with-foreign-string (stype server-type)
     (with-foreign-string (slist scope-list)
@@ -368,6 +372,21 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	      *default-server-url-list*
 	      (slp-raise-error error-code)))))))
 
+(defun find-services (service-type)
+  "Find all services with specified type"
+  (declare (string service-type))
+  (%find-services service-type))
+
+(defun find-servers (server-type
+					 &key (callback-name *default-server-url-callback*)
+					 (scope-list "") (filter "") cookie)
+  (warn "FIND-SERVERS is deprecated. Use FIND-SERVICES instead")
+  (%find-services server-type
+				 :callback-name callback-name
+				 :scope-list scope-list
+				 :filter filter
+				 :cookie cookie))
+					 
 ;; ------------------ find server types -------------------------
 
 (defcfun ("SLPFindSrvTypes" %slp-find-server-types) slp-error-type
@@ -390,7 +409,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	    types)))
   t)
 
-(defun find-server-types (&key (callback-name *default-server-type-callback*)
+(defun %find-service-types (&key (callback-name *default-server-type-callback*)
 				(naming-authority "*") (scope-list "") cookie)
   "Returns a list of server types found"
   (with-foreign-string (nauth naming-authority)
@@ -406,16 +425,32 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 	    *default-server-type-list*
 	    (slp-raise-error error-code))))))
 
+(defun find-service-types ()
+  "Returns a list of server types found"
+  (%find-service-types))
+
+(defun find-server-types (&key (callback-name *default-server-type-callback*)
+				(naming-authority "*") (scope-list "") cookie)
+  (warn "FIND-SERVER-TYPES is deprecated. Use FIND-SERVICE-TYPES")
+  (%find-service-types :callback-name callback-name
+					   :naming-authority naming-authority
+					   :scope-list scope-list
+					   :cookie cookie))
+					   
+
 ;; ---------------------------------------------------------
 
 ;; find all servers
 
-(defun find-all-servers ()
+(defun find-all-services ()
   "Return a list of the urls of all servers found"
   (mapcan (lambda (type)
-	    (find-servers type))
-	  (find-server-types)))
+	    (find-services type))
+	  (find-service-types)))
 
+(defun find-all-servers ()
+  (warn "FIND-ALL-SERVERS is deprecated. Use FIND-ALL-SERVICES")
+  (find-all-services))
 
 ;;; find attrs
 
