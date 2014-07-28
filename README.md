@@ -19,32 +19,34 @@ Before loading the library, ensure your libslp.so (unix) or slp.dll (windows) li
 is available to be loaded on your system. CL-SLP automatically pushes "C:/program files (x86)/OpenSLP/" onto
 *foreign-library-directories* which should enable it to be loaded on Windows.
 
-* Call SLP-OPEN before any other functions. This opens a handle to OpenSLP.
+* Call SLP-OPEN before any other functions. This opens a handle to OpenSLP. It gets called automatically by the other functions
+so you shouldn't need to call it directly. However, in multi-threaded environments you should call SLP-OPEN directly
+before any other functions because the automatic check is not thread-safe.
 
 * Call SLP-CLOSE when finished using the library, this closes the handle and frees the memory allocated both by OpenSLP and CL-SLP.
 
-* Get SLP properties using SLP:GET-PROPERTY and SLP:GET-PROPERTIES. 
+* Get SLP properties using GET-PROPERTY and GET-PROPERTIES. 
 These return a specific property and all SLP properties respectively.
 
-* Discover services using SLP:FIND-SERVERS or SLP:FIND-ALL-SERVERS
+* Discover services using FIND-SERVICES or FIND-ALL-SERVICES
 This returns a list of discovered service urls.
 
-* Get service attributes using SLP:FIND-ATTRIBUTES
+* Get service attributes using FIND-ATTRIBUTES
 This returns a list of assoc lists for attributes of the given server
 
-* Get available scopes using SLP:FIND-SCOPES
+* Get available scopes using FIND-SCOPES
 
-* Get discovered server types using SLP:FIND-SERVER-TYPES
-This returns a list of discovered server types. These can be used as input to SLP-FIND-SERVERS
+* Get discovered service types using FIND-SERVICE-TYPES
+This returns a list of discovered server types. These can be used as input to SLP-FIND-SERVICES
 
-* Discover all servers on all types using SLP:FIND-ALL-SERVERS. 
-This just maps over the server types and calls SLP-FIND-SERVERS
+* Discover all services of all types using FIND-ALL-SERVICES. 
+This just maps over the server types and calls FIND-SERVICES
 
-* Register a service using SLP:REGISTER 
-The lifetime must be positive and less than CL-SLP::*maximum-lifetime* = 65535. 
-By default it is CL-SLP::*default-lifetime* = 10800, which is the OpenSLP default.
+* Register a service using REGISTER 
+The lifetime must be positive and less than *maximum-lifetime* = 65535. 
+By default it is *default-lifetime* = 10800, which is the OpenSLP default.
 
-* Deregister a service using SLP:DEGREGISTER
+* Deregister a service using DEREGISTER
 
 * Attributes are represented as an assoc list and converted to a string using SLP-FORMAT-ATTRIBUTES. 
 For API functions that accept the keyword parameter ATTIBUTES you can give either a string (formatted
@@ -79,11 +81,17 @@ return values. This doesn't make much sense in Common Lisp, since we have other 
 from callbacks so it probably should be either ignored or removed from the Lisp calls.
 
 * Error -19 NETWORK_TIMED_OUT
-This error code seems to be returned on Windows 7 machines (possibly others) on SLP:REGISTER and
-SLP:DEREGISTER, even though the call appears to be successul. Services registered are discsoverable
+This error code seems to be returned on Windows 7 machines (possibly others) on REGISTER and
+DEREGISTER, even though the call appears to be successul. Services registered are discsoverable
 and can be deregistered again so appear to be working fine, even though these calls error.
 CL-SLP therefore ignores this error, but prints a message to *error-output*.
 
+Notes
+------
+
+In earlier versions of CL-SLP the functions FIND-SERVICES, FIND-ALL-SERVICES and FIND-SERVICE-TYPES were
+slightly misnamed as FIND-SERVERS, FIND-ALL-SERVERS and FIND-SERVER-TYPES. These functions remain but are
+now deprecated.
 
 Example
 --------

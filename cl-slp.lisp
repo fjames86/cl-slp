@@ -235,7 +235,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 (defun get-handle ()
   "Get the handle currently in use by cl-slp"
   (unless *slp-handle*
-    (warn "Opening a handle to OpenSLP~%")
+;;    (warn "Opening a handle to OpenSLP~%")
     (slp-open))
 
   (if *slp-handle*
