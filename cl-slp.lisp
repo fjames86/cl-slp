@@ -202,7 +202,7 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 
 ;; open
 
-(defparameter *slp-handle* nil)
+(defvar *slp-handle* nil)
 
 (defcfun ("SLPOpen" %slp-open) slp-error-type
   (lang :string)
@@ -665,3 +665,4 @@ as (name=value),(name=val1,val2,val3), i.e. comma seperated lists that map names
 			(setf pr t)))))
 	   (format s ")")
 	   (setf printed t)))))
+
